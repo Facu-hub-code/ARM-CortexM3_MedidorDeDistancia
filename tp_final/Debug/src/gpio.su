@@ -1,0 +1,5 @@
+../src/gpio.c:62:6:GPIO_PinFunction	24	static
+../src/gpio.c:104:6:GPIO_PinDirection	24	static
+../src/gpio.c:146:6:GPIO_PinWrite	24	static
+../src/gpio.c:189:6:GPIO_PinToggle	24	static
+../src/gpio.c:227:9:GPIO_PinRead	24	static

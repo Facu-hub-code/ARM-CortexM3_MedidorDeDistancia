@@ -1,0 +1,12 @@
+C:\EDIII\Sintetizador\CMSISv2p00_LPC17xx\inc/core_cm3.h:928:22:NVIC_EnableIRQ	16	static
+C:\EDIII\Sintetizador\CMSISv2p00_LPC17xx\inc/core_cm3.h:941:22:NVIC_DisableIRQ	16	static
+C:\EDIII\Sintetizador\CMSISv2p00_LPC17xx\inc/core_cm3.h:982:22:NVIC_ClearPendingIRQ	16	static
+C:\EDIII\Sintetizador\CMSISv2p00_LPC17xx\inc/core_cm3.h:1012:22:NVIC_SetPriority	16	static
+../src/Config.c:11:6:cfgPines	32	static
+../src/Config.c:61:6:cfgDAC	24	static
+../src/Config.c:80:6:cfgDMA	56	static
+../src/Config.c:110:6:cfgADC	16	static
+../src/Config.c:130:6:cfgTIM0	32	static
+../src/Config.c:149:6:cfgTIM1	32	static
+../src/Config.c:168:6:cfgNVIC	8	static
+../src/Config.c:190:6:makeSignals	24	static

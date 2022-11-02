@@ -1,0 +1,4 @@
+../src/Botones.c:3:6:prevSgn	16	static
+../src/Botones.c:10:6:nextSgn	16	static
+../src/Botones.c:17:6:disminuirOct	24	static
+../src/Botones.c:26:6:aumentarOct	24	static
