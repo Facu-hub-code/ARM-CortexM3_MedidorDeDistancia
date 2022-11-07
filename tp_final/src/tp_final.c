@@ -6,8 +6,8 @@
 #include "lpc17xx_systick.h"
 #include "lpc17xx_timer.h"
 #include "lpc17xx_uart.h"
-#include "delay.h"
-#include "lcd.h"
+#include "lcd.h"    //User defined LCD library which contains the lcd routines
+#include "delay.h"  //User defined library which contains the delay routines
 #include "lcd.c"
 #include "delay.c"
 #include "gpio.c"
@@ -17,7 +17,7 @@ void conf_pines_leds(void);
 void conf_pin_buzzer(void);
 void config_int_gpio(void);
 void conf_adc(void);
-void conf_int_boton(void);
+void conf_int_pulsador(void);
 void config_timer0(void); //debouncing
 void config_timer3(void); //buzzer
 void config_timer1(void); //disparo de medicion
@@ -35,13 +35,13 @@ void enviar_info_uart(void);
 uint16_t ADC0Value = 0;
 uint8_t dist_limite = 15;
 
-uint8_t modo_seteo = 1;
+uint8_t modo_seteo = 0;
 
 uint32_t tiempo_echo = 0;
 uint32_t dist_medida = 0;
 
 uint32_t nivel_anterior=0;
-uint32_t nivel_actual=6;
+uint32_t nivel_actual=5;
 uint32_t cont_nivel=0;
 uint32_t cont_nuevo_nivel=0;
 
@@ -53,23 +53,24 @@ uint8_t print_midiendo=0;
 
 int main(void) {
 
-	conf_pines_sensor();
-	conf_pines_leds();
-	conf_int_boton();
+
+	conf_pines_sensor(); //p0.5 como GPIO y de salida pin0.4 como entrada
+	conf_pines_leds(); //P2.0 GPIO   P2.1 GPIO P2.2 GPIO
+	conf_int_pulsador(); //P2.10 como EINT0
 	config_timer0();	//para debouncing
 	conf_adc();
 	config_timer3();	//para buzzer
 	conf_uart();
-	conf_pin_uart();
+	conf_pin_uart(); //P0.2  TXD0 — Transmitter output for UART0.
 
-	LCD_SetUp(P2_6,P2_7,P2_8,P_NC,P_NC,P_NC,P_NC,P0_22,P0_27,P0_28,P2_13); //setesa todos estos pines como salida
-	LCD_Init(2,16); //especifica el tipo de lcd
+	LCD_SetUp(P2_6,P2_7,P2_8,P_NC,P_NC,P_NC,P_NC,P0_22,P0_27,P0_28,P2_13); //setesa todos estos pines como salida los P_NC no los usa
+	//LCD_Init(2,16); //especifica el tipo de lcd (usamos las  dos  lineas y los 16 caracteres
 
 	while(1) {
 
 		if(modo_seteo){
 
-			if(!seteo){
+			if(!seteo){ //flag que se utiliza para que vuelva a resetear todo luego de un modo de medicion
 				seteo=1;
 				print_midiendo=0;	//variable utilizada al entrar a modo de medicion
 				cont_nivel=0;
@@ -88,23 +89,25 @@ int main(void) {
 
 			uint32_t relacion = ADC0Value / 500;		//500 es lo equivalente a cada escalon de distancia seteada
 
-			dist_limite = 15+(relacion*5);		//a partir de la relacion, se setea la distancia limite
+			dist_limite = 15+(relacion*5);		//a partir de la relacion, se setea la distancia limite en cm
 
-			LCD_Clear();
-			LCD_Printf("SETEANDO DIST.");					//se muestra en el lcd el modo en el que esta
-			LCD_Printf("\nDist.Limite:%2dcm",dist_limite);	//y la distancia limite seteada
+			//LCD_Clear();
+			//LCD_Printf("SETEANDO DIST.");					//se muestra en el lcd el modo en el que esta
+			//LCD_Printf("\nDist.Limite:%2dcm",dist_limite);	//y la distancia limite seteada
 
 			DELAY_ms(100);		//espera para volver a a tomar una medidicion
 
-		}else{
+		}
+
+		else{
 
 			if(!print_midiendo){	//solo la primera vez que entra a medir, muestra en el LCD
-				seteo=0;
+				seteo=0; //
 				print_midiendo=1;
 				conf_pin_buzzer();		//vuelve a poner el pin de buzzer en modo MAT3.0
-				LCD_Clear();
-				LCD_Printf("DIST. SETEADA");
-				LCD_Printf("\nDist.Limite:%2dcm",dist_limite);
+				//LCD_Clear();
+				//LCD_Printf("DIST. SETEADA");
+				//LCD_Printf("\nDist.Limite:%2dcm",dist_limite);
 
 				uint8_t dist_ascii_decena=48+(dist_limite/10);
 				uint8_t dist_ascii_unidad=48+(dist_limite-(dist_limite/10)*10);
@@ -116,9 +119,9 @@ int main(void) {
 			}
 
 			disparo_medicion();		//pulso de 10us
-			while(!(LPC_GPIO0->FIOPIN & (1<<4)));
-			config_timer2();		//para medir el tiempo en alto del ECHO
-			while(LPC_GPIO0->FIOPIN & (1<<4));
+			while((LPC_GPIO0->FIOPIN & (1<<4))); //Mientras el echo NO este en HIGH, espera
+			config_timer2();		//para medir el tiempo en alto del ECHO, mientras el ECHO esta en alto mide la onda que rebota
+			while(!LPC_GPIO0->FIOPIN & (1<<4));//Mientras el echo este en HIGH, espera
 			tiempo_echo=LPC_TIM2->TC;	//obtengo el tiempo en alto del ECHO
 			TIM_Cmd(LPC_TIM2, DISABLE);
 			dist_medida=tiempo_echo/58;	//obtengo la medicion
@@ -127,6 +130,7 @@ int main(void) {
 			DELAY_ms(10);		//espera para volver a a tomar una medidicion
 		}
 	}
+
     return 0 ;
 }
 
@@ -161,7 +165,7 @@ void conf_pines_leds(void){
 	PINSEL_CFG_Type pin_conf;
 	pin_conf.Portnum = PINSEL_PORT_2;
 	pin_conf.Pinnum = PINSEL_PIN_0;
-	pin_conf.Funcnum = PINSEL_FUNC_0;
+	pin_conf.Funcnum = PINSEL_FUNC_0;//P2.0 GPIO
 	pin_conf.Pinmode = PINSEL_PINMODE_PULLDOWN;
 	pin_conf.OpenDrain = PINSEL_PINMODE_NORMAL;
 	PINSEL_ConfigPin( &pin_conf);
@@ -169,7 +173,7 @@ void conf_pines_leds(void){
 
 	pin_conf.Portnum = PINSEL_PORT_2;
 	pin_conf.Pinnum = PINSEL_PIN_1;
-	pin_conf.Funcnum = PINSEL_FUNC_0;
+	pin_conf.Funcnum = PINSEL_FUNC_0;  //P2.1 GPIO
 	pin_conf.Pinmode = PINSEL_PINMODE_PULLDOWN;
 	pin_conf.OpenDrain = PINSEL_PINMODE_NORMAL;
 	PINSEL_ConfigPin( &pin_conf);
@@ -177,7 +181,7 @@ void conf_pines_leds(void){
 
 	pin_conf.Portnum = PINSEL_PORT_2;
 	pin_conf.Pinnum = PINSEL_PIN_2;
-	pin_conf.Funcnum = PINSEL_FUNC_0;
+	pin_conf.Funcnum = PINSEL_FUNC_0; //P2.2 GPIO
 	pin_conf.Pinmode = PINSEL_PINMODE_PULLDOWN;
 	pin_conf.OpenDrain = PINSEL_PINMODE_NORMAL;
 	PINSEL_ConfigPin( &pin_conf);
@@ -190,17 +194,17 @@ void conf_adc(void){
 	PINSEL_CFG_Type pin_conf;
 	pin_conf.Portnum = PINSEL_PORT_0;
 	pin_conf.Pinnum = PINSEL_PIN_23;
-	pin_conf.Funcnum = PINSEL_FUNC_1;
+	pin_conf.Funcnum = PINSEL_FUNC_1;  //AD0.0
 	pin_conf.Pinmode = PINSEL_PINMODE_TRISTATE;
 	pin_conf.OpenDrain = PINSEL_PINMODE_NORMAL;
 	PINSEL_ConfigPin( &pin_conf);
 
-	LPC_SC->PCONP 			|= 	(1<<12);
-	LPC_ADC->ADCR 			|= 	(1<<21);
-	LPC_SC->PCLKSEL0 		|= 	(3<<24);
-	LPC_ADC->ADCR 			&= 	~(255<<8);
-	LPC_ADC->ADCR 			&= ~(1<<16);
-	LPC_ADC->ADCR 			&= ~(0b111<<24);
+	LPC_SC->PCONP 			|= 	(1<<12);//converter (ADC) power/clock control bit.
+	LPC_ADC->ADCR 			|= 	(1<<21);//habilita el ADC
+	LPC_SC->PCLKSEL0 		|= 	(3<<24); // CCLK/8
+	LPC_ADC->ADCR 			&= 	~(255<<8);  //Divisor interno no divide, osea que el ADC con el CCLK default de 100MHz es de 12.5Mhz frec de trabajo
+	LPC_ADC->ADCR 			&= ~(1<<16); //Modo burst apagado, uso software para controlarlo
+	LPC_ADC->ADCR 			&= ~(0b111<<24);//Start conversion when the edge selected by bit 27 occurs on MAT1.1.
 
 	return;
 }
@@ -242,7 +246,7 @@ void config_timer0(void){
 	match_config.ResetOnMatch		=	ENABLE;
 	match_config.StopOnMatch		=	DISABLE;
 	match_config.ExtMatchOutputType	=	TIM_EXTMATCH_TOGGLE;
-	match_config.MatchValue			=	9999;
+	match_config.MatchValue			=	9999;  //10ms
 
 	TIM_Init(LPC_TIM0, TIM_TIMER_MODE, &timer_config);
 	TIM_ConfigMatch(LPC_TIM0, &match_config);
@@ -274,7 +278,7 @@ void config_timer1(void){
 	match_config.ResetOnMatch		=	ENABLE;
 	match_config.StopOnMatch		=	ENABLE;
 	match_config.ExtMatchOutputType	=	TIM_EXTMATCH_NOTHING;
-	match_config.MatchValue			=	9; //para 10us
+	match_config.MatchValue			=	9; //para 10us del trigger del sensor(onda que viaja a chocar con el objeto a medir)
 
 	TIM_Init(LPC_TIM1, TIM_TIMER_MODE, &timer_config);
 	TIM_ConfigMatch(LPC_TIM1, &match_config);
@@ -322,21 +326,12 @@ void config_timer2(void){
 
 void comparacion(void){
 
-	if(dist_medida > dist_limite+30)
-		nivel_actual=4;
-	else if(dist_medida > dist_limite+15)
-		nivel_actual=2;
-	else if (dist_medida > dist_limite)
-		nivel_actual=1;
-	else if(dist_medida <= dist_limite)
-		nivel_actual=0;
-
 	if(nivel_anterior != nivel_actual){   //si se detecta cambio de nivel
 		cont_nuevo_nivel++;		//cont de que el cambio sea estable
 	}else{
 		if(cont_nuevo_nivel){	//mientras este cont no sea 0, lo aumentamos en cada medicion estable
 			cont_nuevo_nivel++;
-			if(cont_nuevo_nivel>=5){ //cuando llega a 10, el cambio de nivel fue estable
+			if(cont_nuevo_nivel>=10){ //cuando llega a 10, el cambio de nivel fue estable
 				cont_nivel=0;		//conteo de nivel para envio de info y act de buzzer
 				cont_nuevo_nivel=0;
 			}
@@ -345,38 +340,30 @@ void comparacion(void){
 		}
 	}
 
-	if(cont_nivel==5){		//envio de informacion por uart y act de buzzers y leds
+	if(cont_nivel==10){		//envio de informacion por uart y act de buzzers y leds
+		if(dist_medida > dist_limite+30){
+			nivel_actual=4;
+			LPC_GPIO2->FIOSET |= (1<<2);
+			LPC_GPIO2->FIOCLR |= (1<<0);
+			LPC_GPIO2->FIOCLR |= (1<<1);
 
-		switch(nivel_actual){
-			case 0:
-			{
-				LPC_GPIO2->FIOSET |= (1<<0);
-				LPC_GPIO2->FIOSET |= (1<<1);
-				LPC_GPIO2->FIOSET |= (1<<2);
-				break;
-			}
-			case 1:
-			{
-				LPC_GPIO2->FIOSET |= (1<<0);
-				LPC_GPIO2->FIOCLR |= (1<<1);
-				LPC_GPIO2->FIOCLR |= (1<<2);
-				break;
-			}
-			case 2:
-			{
-				LPC_GPIO2->FIOSET |= (1<<1);
-				LPC_GPIO2->FIOCLR |= (1<<0);
-				LPC_GPIO2->FIOCLR |= (1<<2);
-				break;
-			}
-			case 4:
-			{
-				LPC_GPIO2->FIOSET |= (1<<2);
-				LPC_GPIO2->FIOCLR |= (1<<0);
-				LPC_GPIO2->FIOCLR |= (1<<1);
-				break;
-			}
+		}else if(dist_medida > dist_limite+15){
+			nivel_actual=2;
+			LPC_GPIO2->FIOSET |= (1<<1);
+			LPC_GPIO2->FIOCLR |= (1<<0);
+			LPC_GPIO2->FIOCLR |= (1<<2);
 
+		}else if (dist_medida > dist_limite){
+			nivel_actual=1;
+			LPC_GPIO2->FIOSET |= (1<<0);
+			LPC_GPIO2->FIOCLR |= (1<<1);
+			LPC_GPIO2->FIOCLR |= (1<<2);
+
+		}else if(dist_medida <= dist_limite){
+			nivel_actual=0;
+			LPC_GPIO2->FIOSET |= (1<<0);
+			LPC_GPIO2->FIOSET |= (1<<1);
+			LPC_GPIO2->FIOSET |= (1<<2);
 		}
 		act_timer();
 		enviar_info_uart();
@@ -388,12 +375,12 @@ void comparacion(void){
 	return;
 }
 
-void conf_int_boton(void){
+void conf_int_pulsador(void){
 
 	PINSEL_CFG_Type pin_conf;
 	pin_conf.Portnum = PINSEL_PORT_2;
 	pin_conf.Pinnum = PINSEL_PIN_10;
-	pin_conf.Funcnum = PINSEL_FUNC_1;
+	pin_conf.Funcnum = PINSEL_FUNC_1; //P2.10 como EINT0
 	pin_conf.Pinmode = PINSEL_PINMODE_PULLUP;
 	pin_conf.OpenDrain = PINSEL_PINMODE_NORMAL;
 	PINSEL_ConfigPin( &pin_conf);
@@ -421,11 +408,11 @@ void EINT0_IRQHandler(void){
 
 void TIMER0_IRQHandler(void){
 
-	if((LPC_GPIO2->FIOPIN & (1<<10)) == 0){
+	if((LPC_GPIO2->FIOPIN & (1<<10)) == 0){  //P2.10 interrumpio?
 
 		if(debounce_cont>=5){
 
-			modo_seteo ^= 1;
+			modo_seteo ^= 1; //Togglea de modo medicion/estado
 			NVIC_EnableIRQ(EINT0_IRQn);
 			TIM_Cmd(LPC_TIM0, DISABLE);
 
@@ -488,13 +475,13 @@ void off_buzzer(void){
 void conf_pin_uart(void){
 	PINSEL_CFG_Type PinCfg;
 	//pines Tx y Rx
-	PinCfg.Funcnum = 1;
+	PinCfg.Funcnum = 1; //P0.2  TXD0 — Transmitter output for UART0.
 	PinCfg.OpenDrain = 0;
 	PinCfg.Pinmode = 0;
 	PinCfg.Pinnum = 2;
 	PinCfg.Portnum = 0;
 	PINSEL_ConfigPin(&PinCfg);
-	PinCfg.Pinnum = 3;
+	PinCfg.Pinnum = 3; //P0.3
 	PINSEL_ConfigPin(&PinCfg);
 	return;
 }
@@ -540,4 +527,6 @@ void enviar_info_uart(void){
 	}
 
 }
+
+
 
